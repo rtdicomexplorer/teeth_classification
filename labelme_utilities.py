@@ -7,7 +7,8 @@ from PIL import Image
 from pathlib import Path
 import shutil
 import random
-from ultralytics import YOLO
+import kagglehub
+
 
 def get_dominant_labels(json_dir):
     group_label_freq = defaultdict(lambda: defaultdict(int))  # group_id → label → count
@@ -46,7 +47,7 @@ def create_data_yaml(save_path, train_dir, val_dir, label_list):
         import yaml
         yaml.dump(yaml_content, f)
 
-    print(f"✅ data.yaml gespeichert unter: {save_path}")
+    print(f"✅ data.yaml saved: {save_path}")
 
 def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_label, label_to_id):
 
@@ -89,7 +90,7 @@ def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_labe
         with open(output_file, "w") as out:
             out.write("\n".join(yolo_lines))
 
-def split_dataset(image_dir, label_dir, out_dir, train_ratio=0.8):
+def __split_dataset(image_dir, label_dir, out_dir, train_ratio=0.8):
     image_files = [f for f in os.listdir(image_dir) if f.endswith(".png")]
     random.shuffle(image_files)
     split_index = int(len(image_files) * train_ratio)
@@ -104,27 +105,45 @@ def split_dataset(image_dir, label_dir, out_dir, train_ratio=0.8):
             label_file = file.replace(".png", ".txt")
             shutil.copy(os.path.join(label_dir, label_file), os.path.join(out_dir, "labels", split, label_file))
 
-    print("✅ Train/Val Split abgeschlossen")
+    print("✅ Train/Val Split completed")
 
 
-def convert_mask_to_color(mask):
-    """
-    Wandelt eine Label-Maske (0=Background, 1=Molars, ...) in ein RGB-Bild um.
-    """
-    color_map = {
-        0: [0, 0, 0],         # Hintergrund = schwarz
-        1: [255, 0, 0],       # Molars = rot
-        2: [0, 255, 0],       # Premolars = grün
-        3: [0, 0, 255]        # Incisors = blau
-    }
+def split_dataset(image_dir, yolo_label_dir, unet_label_dir, out_dir, train_ratio=0.8):
+    image_files = [f for f in os.listdir(image_dir) if f.endswith(".png")]
+    random.shuffle(image_files)
+    split_index = int(len(image_files) * train_ratio)
+    train_files = image_files[:split_index]
+    val_files = image_files[split_index:]
 
-    h, w = mask.shape
-    color_mask = np.zeros((h, w, 3), dtype=np.uint8)
+    for split, file_list in [("train", train_files), ("val", val_files)]:
+        os.makedirs(os.path.join(out_dir, "images", split), exist_ok=True)
+        os.makedirs(os.path.join(out_dir, "labels", split), exist_ok=True)#yolo need a correspondence between image and labels name should bve labels...
+        os.makedirs(os.path.join(out_dir, "masks", split), exist_ok=True)
+        for file in file_list:
+            shutil.copy(os.path.join(image_dir, file), os.path.join(out_dir, "images", split, file))
+            yolo_label_file = file.replace(".png", ".txt")
+            shutil.copy(os.path.join(yolo_label_dir, yolo_label_file), os.path.join(out_dir, "labels", split, yolo_label_file))
+            shutil.copy(os.path.join(unet_label_dir, file), os.path.join(out_dir, "masks", split, file))
 
-    for class_idx, color in color_map.items():
-        color_mask[mask == class_idx] = color
+    print("✅ Train/Val Split completed")
 
-    return color_mask
+
+
+
+def get_kaggle_dataset(dataset_path= "kvipularya/a-collection-of-dental-x-ray-images-for-analysis", kaggle_path= 'kaggle'):
+    '''
+    Method to download the trainings data. you have got already a kaggle token.
+    '''
+    os.environ['KAGGLE_CONFIG_DIR'] = kaggle_path
+    # Download the latest version of a dataset
+    path = kagglehub.dataset_download(dataset_path)
+    print("Data downloaded to:", path)
+    destination_path = os.path.join(kaggle_path, 'dataset')
+    os.makedirs(destination_path, exist_ok=True)
+    shutil.copytree(path, destination_path, dirs_exist_ok=True)
+    print("Copied data to:", destination_path)
+    shutil.rmtree(path)
+
 
 def __labelme_json_to_mask(json_path, img_shape):
     class_map = {
@@ -147,6 +166,56 @@ def __labelme_json_to_mask(json_path, img_shape):
 
     return mask
 
+
+def create_all_masks(image_dir, json_dir, unet_labels_dir, create_preview = True):
+
+    for img_path in sorted(image_dir.glob("*.png")):
+        json_path = json_dir / (img_path.stem + ".json")
+
+        if not json_path.exists():
+            print(f"⚠️ JSON missed for {img_path.name}.")
+            continue
+
+        img = Image.open(img_path)
+        img_shape = (img.height, img.width)
+
+        mask = __labelme_json_to_mask(json_path, img_shape)
+        
+        mask_path = Path(unet_labels_dir) / (img_path.stem + ".png")
+        Image.fromarray(mask).save(mask_path)
+
+        if create_preview == True:
+            color_mask = convert_mask_to_color(mask)
+            preview_dir = Path("preview_masks")
+            preview_dir.mkdir(exist_ok=True)
+            Image.fromarray(color_mask).save(preview_dir / f"{img_path.stem}_color.png")
+            unique_values = np.unique(mask)
+            print(f"{img_path.name} → classes in mask: {unique_values}")
+
+
+    print("✅ All masks saved")
+
+
+
+
+def convert_mask_to_color(mask):
+    """
+    Wandelt eine Label-Maske (0=Background, 1=Molars, ...) in ein RGB-Bild um.
+    """
+    color_map = {
+        0: [0, 0, 0],         # Hintergrund = schwarz
+        1: [255, 0, 0],       # Molars = rot
+        2: [0, 255, 0],       # Premolars = grün
+        3: [0, 0, 255]        # Incisors = blau
+    }
+
+    h, w = mask.shape
+    color_mask = np.zeros((h, w, 3), dtype=np.uint8)
+
+    for class_idx, color in color_map.items():
+        color_mask[mask == class_idx] = color
+
+    return color_mask
 
 # === Durchlauf über alle Bilder ===
 # def create_all_masks():

@@ -17,9 +17,9 @@ model = YOLO("yolov8m.pt") # yolov8n.pt
 
 model.train(
     data="dataset/data.yaml",
-    epochs=50,
-    imgsz=800,
-    batch=8,
+    epochs=2,
+    imgsz=400,
+    batch=84,
     # lr0=0.01,
     # optimizer='SGD',
     # workers=8,

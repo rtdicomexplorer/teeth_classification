@@ -5,3 +5,6 @@ labelme-*
 dataset
 runs
 yolov*
+kaggle
+preview*
+weights
