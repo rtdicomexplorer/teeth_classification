@@ -128,8 +128,6 @@ def split_dataset(image_dir, yolo_label_dir, unet_label_dir, out_dir, train_rati
     print("✅ Train/Val Split completed")
 
 
-
-
 def get_kaggle_dataset(dataset_path= "kvipularya/a-collection-of-dental-x-ray-images-for-analysis", kaggle_path= 'kaggle'):
     '''
     Method to download the trainings data. you have got already a kaggle token.
@@ -185,7 +183,7 @@ def create_all_masks(image_dir, json_dir, unet_labels_dir, create_preview = True
         Image.fromarray(mask).save(mask_path)
 
         if create_preview == True:
-            color_mask = convert_mask_to_color(mask)
+            color_mask = __convert_mask_to_color(mask)
             preview_dir = Path("preview_masks")
             preview_dir.mkdir(exist_ok=True)
             Image.fromarray(color_mask).save(preview_dir / f"{img_path.stem}_color.png")
@@ -196,9 +194,7 @@ def create_all_masks(image_dir, json_dir, unet_labels_dir, create_preview = True
     print("✅ All masks saved")
 
 
-
-
-def convert_mask_to_color(mask):
+def __convert_mask_to_color(mask):
     """
     Wandelt eine Label-Maske (0=Background, 1=Molars, ...) in ein RGB-Bild um.
     """
@@ -217,44 +213,3 @@ def convert_mask_to_color(mask):
 
     return color_mask
 
-# === Durchlauf über alle Bilder ===
-# def create_all_masks():
-#     for img_path in sorted(image_dir.glob("*.png")):
-#         json_path = json_dir / (img_path.stem + ".json")
-
-#         if not json_path.exists():
-#             print(f"⚠️ JSON fehlt für {img_path.name} – wird übersprungen.")
-#             continue
-
-#         img = Image.open(img_path)
-#         img_shape = (img.height, img.width)
-
-#         mask = labelme_json_to_mask(json_path, img_shape)
-
-#         color_mask = convert_mask_to_color(mask)
-#         preview_dir = Path("preview_masks")
-#         preview_dir.mkdir(exist_ok=True)
-#         Image.fromarray(color_mask).save(preview_dir / f"{img_path.stem}_color.png")
-
-
-#         # Debug: zeige Werte in Maske
-#         unique_values = np.unique(mask)
-#         print(f"{img_path.name} → Klassen in Maske: {unique_values}")
-
-#         # Speichern
-#         mask_path = mask_dir / (img_path.stem + ".png")
-#         Image.fromarray(mask).save(mask_path)
-
-#     print("✅ Alle Masken erfolgreich erstellt und gespeichert.")
-
-
-# model = YOLO("runs/train/teeth-classification/weights/best.pt")
-# metrics = model.val(data="dataset/data.yaml", imgsz=800)
-
-# # === Konfiguration ===
-# image_dir = Path("all-images")
-# json_dir = Path("labelme-labels")
-# mask_dir = Path("labelme-masks")
-# mask_dir.mkdir(exist_ok=True)
-
-# create_all_masks()

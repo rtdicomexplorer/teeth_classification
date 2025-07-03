@@ -1,7 +1,5 @@
-import os
 from pathlib import Path
 from PIL import Image
-import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 
@@ -14,7 +12,7 @@ class UnetSegmentationDataset(Dataset):
         self.images = sorted([p for p in self.image_dir.glob("*.png")])
         self.masks = sorted([p for p in self.mask_dir.glob("*.png")])
 
-        assert len(self.images) == len(self.masks), "❌ Bilder und Maskenanzahl stimmen nicht überein."
+        assert len(self.images) == len(self.masks), "❌ Images and masks does not match."
 
         self.image_transform = T.Compose([
             T.Resize(self.img_size),
@@ -34,10 +32,10 @@ class UnetSegmentationDataset(Dataset):
         mask_path = self.masks[idx]
 
         image = Image.open(img_path).convert("RGB")
-        mask = Image.open(mask_path).convert("L")  # L = 1 Kanal
+        mask = Image.open(mask_path).convert("L")  # L = 1 channel
 
         image = self.image_transform(image)
         mask = self.mask_transform(mask)
-        mask = (mask > 0.5).float()  # binarisiere Maske (0 oder 1)
+        mask = (mask > 0.5).float()  # binary Masks (0 oder 1)
 
         return image, mask
