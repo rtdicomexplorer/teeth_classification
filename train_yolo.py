@@ -1,33 +1,10 @@
 import torch
 from ultralytics import YOLO
+import os
+import sys
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"💻 Verwende Gerät: {device}")
 
-# 1. Ein kleines Modell zum Start (schnell, gut zum Testen)
-model = YOLO("yolov8m.pt") # yolov8n.pt
 
-# 2. Training starten
-# model.train(
-#     data="karies.yaml",    # dein Konfigurationsfile
-#     epochs=50,             # Anzahl der Durchläufe
-#     imgsz=640,             # Bildgröße
-#     batch=8,               # Batchgröße (an GPU/RAM anpassen)
-# )
-
-model.train(
-    data="dataset/data.yaml",
-    epochs=2,
-    imgsz=400,
-    batch=84,
-    # lr0=0.01,
-    # optimizer='SGD',
-    # workers=8,
-    device=device,
-    project='runs/train',
-    name='teeth-classification',
-    exist_ok=True
-)
 
 # | Parameter   | Bedeutung                                  | Empfehlung                                                       |
 # | ----------- | ------------------------------------------ | ---------------------------------------------------------------- |
@@ -56,3 +33,30 @@ model.train(
 # | `P*curve.png`          | Precision/Recall-Kurven                                                     |
 # | `train_batch*.jpg`     | Visualisierung einzelner Trainingsbatches                                   |
 # | `val_batch*.jpg`       | Visualisierung der Validierungsvorhersagen                                  |
+
+
+def train_yolo_model(output_folder, epochs):
+    os.makedirs(output_folder, exist_ok=True)
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"💻 Device selected: {device}")
+
+    model = YOLO("yolov8m.pt") # yolov8n.pt
+
+    model.train(
+        data="dataset/data.yaml",
+        epochs=int(epochs),
+        imgsz=400,
+        batch=84,
+        # lr0=0.01,
+        # optimizer='SGD',
+        # workers=8,
+        device=device,
+        project='runs/train',
+        name='teeth-classification',
+        exist_ok=True
+    )
+
+
+if __name__=='__main__':
+  train_yolo_model(sys.argv[1:][0],sys.argv[1:][1])
+  
