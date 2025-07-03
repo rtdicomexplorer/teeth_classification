@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from labelme_utilities import get_dominant_labels, create_data_yaml, convert_labelme_to_yolo,split_dataset, get_kaggle_dataset, create_all_masks, split_dataset
-
+import sys
 
 # step 0: just if you have a token of kaggle
 # os.makedirs(os.path.join(final_dataset,unet_labels), exist_ok=True)
@@ -37,4 +37,4 @@ def main(root):
 
 
 if __name__ == "__main__":
-    main("kaggle/dataset")
+     main(sys.argv[1:][0])
