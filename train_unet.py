@@ -16,7 +16,7 @@ def dice_score(preds, targets, threshold=0.5):
     dice = (2. * intersection + 1e-8) / (union + 1e-8)
     return dice.item()
 
-def train_unet(outop_dir, epochs):
+def train_unet(output_dir, epochs):
     # === Settings ===
     EPOCHS = int(epochs)
     BATCH_SIZE = 4
@@ -24,7 +24,7 @@ def train_unet(outop_dir, epochs):
     LEARNING_RATE = 1e-4
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     OUTPUT_MODEL_NAME = "unet_teeth_classification.pt"
-    OUTPUT_DIR = outop_dir
+    OUTPUT_DIR = output_dir
     patience = 5
     min_delta = 0.0
     counter = 0

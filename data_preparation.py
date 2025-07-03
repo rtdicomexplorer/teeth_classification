@@ -37,4 +37,6 @@ def main(root):
 
 
 if __name__ == "__main__":
-     main(sys.argv[1:][0])
+    root = sys.argv[1:][0] 
+    #  root = "kaggle/dataset"
+    main(root)

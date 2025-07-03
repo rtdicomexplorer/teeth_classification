@@ -49,9 +49,14 @@ def create_data_yaml(save_path, train_dir, val_dir, label_list):
 
     print(f"✅ data.yaml saved: {save_path}")
 
-def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_label, label_to_id):
+def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_label, _label_to_id):
 
+    # some labelme have typo error with plurals (s)
+    label_to_id = {k.lower(): v for k, v in _label_to_id.items()}
     os.makedirs(output_label_dir, exist_ok=True)
+    skipped_files = 0
+    converted_files = 0
+    unknown_labels = set()
 
     for filename in os.listdir(json_dir):
         if not filename.endswith(".json"):
@@ -68,17 +73,26 @@ def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_labe
 
         yolo_lines = []
 
-        for shape in data["shapes"]:
-            label = group_to_label.get(shape.get("group_id"))
-            if not label:
-                continue
-            class_id = label_to_id[label]
+        for shape in data.get("shapes", []):
+            group_id = shape.get("group_id")
+            label = group_to_label.get(group_id) if group_id is not None else shape.get("label")
 
+            # Normalize label (e.g., case-insensitive, remove trailing 's')
+            label = label.strip().lower()
+            label = label.rstrip('s') + 's'  # Ensure plural form: 'molar' → 'molars'
+
+            if label not in label_to_id:
+                unknown_labels.add(label)
+                continue
+
+            class_id = label_to_id[label]
             points = shape["points"]
             xs = [p[0] for p in points]
             ys = [p[1] for p in points]
             xmin, xmax = min(xs), max(xs)
             ymin, ymax = min(ys), max(ys)
+
+            # Normalize box coordinates
             x_center = ((xmin + xmax) / 2) / w
             y_center = ((ymin + ymax) / 2) / h
             bbox_width = (xmax - xmin) / w
@@ -86,9 +100,19 @@ def convert_labelme_to_yolo(json_dir, image_dir, output_label_dir, group_to_labe
 
             yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {bbox_width:.6f} {bbox_height:.6f}")
 
+
+
         output_file = os.path.join(output_label_dir, filename.replace(".json", ".txt"))
-        with open(output_file, "w") as out:
-            out.write("\n".join(yolo_lines))
+        if yolo_lines:
+            with open(output_file, "w") as out:
+                out.write("\n".join(yolo_lines))
+            converted_files += 1
+        else:
+            # Don't write empty label files
+            skipped_files += 1
+    print(f"✅ Conversion complete. {converted_files} files converted, {skipped_files} skipped (no valid labels).")
+
+    
 
 def __split_dataset(image_dir, label_dir, out_dir, train_ratio=0.8):
     image_files = [f for f in os.listdir(image_dir) if f.endswith(".png")]
