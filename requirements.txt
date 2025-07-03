@@ -33,8 +33,8 @@ scipy==1.15.3
 six==1.17.0
 sympy
 text-unidecode==1.3
-torch==2.6.0
-torchvision==0.22.1
+torch
+torchvision
 tqdm==4.67.1
 typing_extensions==4.14.0
 tzdata==2025.2
