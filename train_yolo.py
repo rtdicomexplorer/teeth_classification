@@ -35,8 +35,8 @@ import sys
 # | `val_batch*.jpg`       | Visualisierung der Validierungsvorhersagen                                  |
 
 
-def train_yolo_model(output_folder, epochs):
-    os.makedirs(output_folder, exist_ok=True)
+def train_yolo_model(output_dir, epochs):
+    os.makedirs(output_dir, exist_ok=True)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print(f"💻 Device selected: {device}")
 
@@ -45,13 +45,13 @@ def train_yolo_model(output_folder, epochs):
     model.train(
         data="dataset/data.yaml",
         epochs=int(epochs),
-        imgsz=400,
-        batch=84,
-        # lr0=0.01,
-        # optimizer='SGD',
-        # workers=8,
+        imgsz=640,       # bigger images might improve accuracy but slower
+        batch=32,  #16, 32, or 64
+        lr0=0.01,
+        optimizer='SGD',
+        workers=4,
         device=device,
-        project='runs/train',
+        project=output_dir,
         name='teeth-classification',
         exist_ok=True
     )
