@@ -2,6 +2,7 @@ import torch
 from ultralytics import YOLO
 import os
 import sys
+import csv
 
 
 
@@ -55,6 +56,28 @@ def train_yolo_model(output_dir, epochs):
         name='teeth-classification',
         exist_ok=True
     )
+
+    # After training: load best model and evaluate
+    best_model = YOLO('runs/train/teeth-classification/weights/best.pt')
+    metrics = best_model.val(data='dataset/data.yaml')
+    # Create CSV file
+    csv_path = '/content/drive/MyDrive/yolo_output/teeth-classification/eval_metrics.csv'
+
+    # Extract main metrics
+    rows = [
+            ['Metric', 'Value'],
+            ['Precision', metrics.box.precision],
+            ['Recall', metrics.box.recall],
+            ['mAP50', metrics.box.map50],
+            ['mAP50-95', metrics.box.map]
+        ]
+
+        # Save to CSV
+    with open(csv_path, mode='w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerows(rows)
+
+    print(f"🔍 Metrics saved to {csv_path}")
 
 
 if __name__=='__main__':
