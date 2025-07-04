@@ -156,5 +156,5 @@ def predict(model_name,source_dir):
 
 
 if __name__=="__main__":
-    
+    ''' Input parameter: model name and source dir to analize'''
     predict(sys.argv[1:][0],sys.argv[1:][1])
