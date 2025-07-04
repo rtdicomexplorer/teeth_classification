@@ -152,7 +152,7 @@ def predict(model_name,source_dir):
 
     __save_predictions_as_txt(results, os.path.join(source_dir,'predictions_txt'))
     __save_predictions_as_json(results, os.path.join(source_dir,'predictions.json'), class_names)
-    __save_predictions_as_csv(results, os.path.join(source_dir,'predictions.csv', class_names))
+    __save_predictions_as_csv(results, os.path.join(source_dir,'predictions.csv'), class_names)
 
 
 if __name__=="__main__":
