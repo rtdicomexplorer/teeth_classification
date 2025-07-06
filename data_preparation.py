@@ -17,14 +17,14 @@ def main(root):
     os.makedirs(final_dataset, exist_ok=True)
 
     # step 1: get the classification
-    group_to_label, label_to_id, label_list = get_dominant_labels(labelme_dir)
+    group_to_label,label_list = get_dominant_labels(labelme_dir)
 
     # step 2: create the unet-masks from labelme 
     os.makedirs(unet_labels, exist_ok=True)
-    create_all_masks(Path(image_dir), Path(labelme_dir),Path(unet_labels),create_preview=False)
+    create_all_masks(Path(image_dir), Path(labelme_dir),Path(unet_labels),group_to_label,create_preview=True)
 
     # step 3: create the yolo-labels from labelme
-    convert_labelme_to_yolo(labelme_dir, image_dir, yolo_labels, group_to_label, label_to_id)
+    convert_labelme_to_yolo(labelme_dir, image_dir, yolo_labels, group_to_label)
 
     # step 4: split the whole dataset (images, labels, masks) into train, val
     split_dataset(image_dir, yolo_labels,unet_labels, final_dataset)
@@ -37,6 +37,7 @@ def main(root):
 
 
 if __name__ == "__main__":
+    '''input dataset whre are the labelme.json and the images'''
     root = sys.argv[1:][0] 
-    #  root = "kaggle/dataset"
+    #root = "kaggle/dataset"
     main(root)

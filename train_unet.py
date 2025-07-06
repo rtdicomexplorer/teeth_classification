@@ -7,8 +7,11 @@ from unetmodel.unet_model import UNet
 import matplotlib.pyplot as plt
 import os
 import sys
+import random
+import numpy as np
+from tqdm import tqdm
 
-def dice_score(preds, targets, threshold=0.5):
+def binary_dice_score(preds, targets, threshold=0.5):
     preds = torch.sigmoid(preds)
     preds = (preds > threshold).float()
     intersection = (preds * targets).sum()
@@ -16,11 +19,25 @@ def dice_score(preds, targets, threshold=0.5):
     dice = (2. * intersection + 1e-8) / (union + 1e-8)
     return dice.item()
 
+# === Multiclass Dice Score (optional) ===
+def multiclass_dice_score(preds, targets, num_classes=5):
+    preds = torch.argmax(preds, dim=1)
+    dice_scores = []
+    for cls in range(1, num_classes):  # skip background if desired
+        pred_cls = (preds == cls).float()
+        target_cls = (targets == cls).float()
+        intersection = (pred_cls * target_cls).sum()
+        union = pred_cls.sum() + target_cls.sum()
+        dice = (2. * intersection + 1e-8) / (union + 1e-8)
+        dice_scores.append(dice.item())
+    return sum(dice_scores) / len(dice_scores)
+
 def train_unet(output_dir, epochs):
     # === Settings ===
+    NUM_CLASSES = 5
     EPOCHS = int(epochs)
     BATCH_SIZE = 4
-    IMG_SIZE = (512, 256)
+    IMG_SIZE = (256, 512)
     LEARNING_RATE = 1e-4
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     OUTPUT_MODEL_NAME = "unet_teeth_classification.pt"
@@ -29,16 +46,27 @@ def train_unet(output_dir, epochs):
     min_delta = 0.0
     counter = 0
 
+    torch.manual_seed(42)
+    np.random.seed(42)
+    random.seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
     # === Data ===
     train_ds = UnetSegmentationDataset("dataset/images/train", "dataset/masks/train", IMG_SIZE)
     val_ds = UnetSegmentationDataset("dataset/images/val", "dataset/masks/val", IMG_SIZE)
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE)
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,num_workers=4, pin_memory=True)
+    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE,num_workers=4, pin_memory=True)
 
     # === Modell initialization ===
-    model = UNet().to(DEVICE)
-    loss_fn = nn.BCEWithLogitsLoss()  # stabiler als BCELoss
+    model = UNet(in_channels=3, out_channels=NUM_CLASSES).to(DEVICE)
+    #loss_fn = nn.BCEWithLogitsLoss()  # stabiler als BCELoss but just for binary classification not muulticlass 5 in our case
+    loss_fn = nn.CrossEntropyLoss()
+
     optimizer = Adam(model.parameters(), lr=LEARNING_RATE)
 
 
@@ -49,17 +77,20 @@ def train_unet(output_dir, epochs):
         # === Trainingsloop ===
         model.train()
         running_loss = 0.0
-        for images, masks in train_loader:
+        pbar = tqdm(train_loader, desc=f"Training Epoch {epoch+1}/{EPOCHS}", leave=False)
+        for images, masks in pbar:
 
             preds = model(images.to(DEVICE))
-            loss = loss_fn(preds, masks.to(DEVICE).float())
+            loss = loss_fn(preds, masks.to(DEVICE).long())# Important: integer class labels
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item()
-
+            pbar.set_postfix(loss=f"{loss.item():.4f}")
+            pbar.refresh()
+        pbar.close()
         avg_train_loss = running_loss / len(train_loader)
         train_losses.append(avg_train_loss)
 
@@ -68,18 +99,23 @@ def train_unet(output_dir, epochs):
         val_loss = 0.0
         dice_scores = []
         with torch.no_grad():
-            for images, masks in val_loader:
+            pbar = tqdm(val_loader, desc=f"Validation Epoch {epoch+1}/{EPOCHS}", leave=False)
+            for images, masks in pbar:
                 preds = model(images.to(DEVICE))
-                loss = loss_fn(preds, masks.to(DEVICE).float())
+                loss = loss_fn(preds, masks.to(DEVICE).long())
                 val_loss += loss.item()
-                dice = dice_score(preds, masks.to(DEVICE).float())
+                #dice = binary_dice_score(preds, masks.to(DEVICE).float())
+                dice = multiclass_dice_score(preds, masks.to(DEVICE).long(), num_classes=NUM_CLASSES)
                 dice_scores.append(dice)
+                pbar.set_postfix(loss=f"{loss.item():.4f}", dice=f"{dice:.4f}")
+                pbar.refresh()
+            pbar.close()
 
         avg_dice = sum(dice_scores) / len(dice_scores)
-        print(f"🎯 Val Dice: {avg_dice:.4f}")
         avg_val_loss = val_loss / len(val_loader)
         val_losses.append(avg_val_loss)
-        print(f"📉 Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f}")
+        print(f"📉 Train Loss: {avg_train_loss:.4f} | Val Loss: {avg_val_loss:.4f} | 🎯 Dice: {avg_dice:.4f}")
+
 
         
         # === Early Stopping check ===
@@ -89,7 +125,12 @@ def train_unet(output_dir, epochs):
             os.makedirs(OUTPUT_DIR, exist_ok=True)
             # model_path = os.path.join(OUTPUT_DIR, f"{epoch+1:02d}_val{avg_val_loss:.4f}.pt")
             model_path = os.path.join(OUTPUT_DIR, OUTPUT_MODEL_NAME)
-            torch.save(model.state_dict(),  model_path)
+            torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'loss': avg_val_loss,
+                    }, model_path)
             print(f"💾 Modell saved as {model_path}")
             counter = 0  # Reset, 
         else:
@@ -117,6 +158,10 @@ def train_unet(output_dir, epochs):
 
 
 if __name__=="__main__":
+    ''' Input parameter: output_dir,  epochs'''
+    outputdir = 'output_unet'
+    epochs = 50
+    # train_unet(output_dir=outputdir, epochs=epochs)
     train_unet(sys.argv[1:][0],sys.argv[1:][1])
 
 
