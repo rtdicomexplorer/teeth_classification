@@ -34,7 +34,26 @@ The mmodel will be saved into weights
 
 
 
+
+
+
+
 interesting for the dataset also https://github.com/devichand579/Instance_seg_teeth
+
+here the new dataset: https://universe.roboflow.com/rf100-vl-fsod/ufba-425-asgxh-fsod-djrs
+
+the classes (channels) ['11','12','13','14','15','16','17','18',
+                        '21','22','23','24','25','26','27','28',
+                        '31','32','33','34','35','36','37','38',
+                        '41','42','43','44','45','46','47','48']
+
+the labes are splitted in folder cate1...cate10 to distinguish the charateristic..
+in each folder they are saved as: cate(i)-img_channel_nr. Each label contain just one channel, then the relation is: 
+### 1-image-> n-channels-labels. single class
+
+To train a model, we can use the dataset with these structure or we can merge for each cate all channels-label of one image i just one label also 
+### 1-image->onelabel(with all channels) multiclass
+
 
 
 create new label:

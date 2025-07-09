@@ -6,13 +6,13 @@ import numpy as np
 import torch
 
 class UnetSegmentationDataset(Dataset):
-    def __init__(self, image_dir, mask_dir, img_size):
+    def __init__(self, image_dir, mask_dir, img_size= None):
         self.image_dir = Path(image_dir)
         self.mask_dir = Path(mask_dir)
         self.img_size = img_size
 
-        self.images = sorted([p for p in self.image_dir.glob("*.png")])
-        self.masks = sorted([p for p in self.mask_dir.glob("*.png")])
+        self.images = sorted([p for p in self.image_dir.glob("*.jpg")])
+        self.masks = sorted([p for p in self.mask_dir.glob("*.tiff")])
 
         assert len(self.images) == len(self.masks), "❌ Images and masks does not match."
 
@@ -25,12 +25,12 @@ class UnetSegmentationDataset(Dataset):
         mask_path = self.masks[idx]
 
         image = Image.open(img_path).convert("RGB")
-        # Correct PIL resize: width first, height second
-        image = image.resize((self.img_size[1], self.img_size[0]), resample=Image.BILINEAR)
-        image = T.ToTensor()(image)  # convert to tensor after resize
-
         mask = Image.open(mask_path).convert("L")
-        mask = mask.resize((self.img_size[1], self.img_size[0]), resample=Image.NEAREST)
+        # Correct PIL resize: width first, height second
+        if self.img_size is not None:
+            image = image.resize((self.img_size[1], self.img_size[0]), resample=Image.BILINEAR)
+            mask = mask.resize((self.img_size[1], self.img_size[0]), resample=Image.NEAREST)
+        image = T.ToTensor()(image)  # convert to tensor after resize       
         mask = np.array(mask, dtype=np.uint8)
         mask = torch.from_numpy(mask).long()
 

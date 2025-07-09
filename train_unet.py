@@ -32,35 +32,42 @@ def multiclass_dice_score(preds, targets, num_classes=5):
         dice_scores.append(dice.item())
     return sum(dice_scores) / len(dice_scores)
 
-def train_unet(output_dir, epochs):
+def train_unet(data_dir, output_dir, epochs, class_items):
     # === Settings ===
-    NUM_CLASSES = 5
+    NUM_CLASSES = class_items
     EPOCHS = int(epochs)
     BATCH_SIZE = 4
-    IMG_SIZE = (256, 512)
+    IMG_SIZE = None#(256, 512)
     LEARNING_RATE = 1e-4
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    OUTPUT_MODEL_NAME = "unet_teeth_classification.pt"
+    OUTPUT_MODEL_NAME = "best_unet.pt"
     OUTPUT_DIR = output_dir
+
+    print(f"Settings: dataset {dataset_dir}; output_dir {output_dir} nr classes {NUM_CLASSES}; Epochs: {epochs}")
+
+
     patience = 5
     min_delta = 0.0
     counter = 0
 
+    images_dir = data_dir # 'dataset_split/'
+    pin_memory = False
     torch.manual_seed(42)
     np.random.seed(42)
     random.seed(42)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(42)
+        pin_memory = True
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
 
     # === Data ===
-    train_ds = UnetSegmentationDataset("dataset/images/train", "dataset/masks/train", IMG_SIZE)
-    val_ds = UnetSegmentationDataset("dataset/images/val", "dataset/masks/val", IMG_SIZE)
+    train_ds = UnetSegmentationDataset(os.path.join(images_dir,"images/train"), os.path.join(images_dir,"masks/train"), IMG_SIZE)
+    val_ds = UnetSegmentationDataset(os.path.join(images_dir,"images/val"), os.path.join(images_dir,"masks/val"), IMG_SIZE)
 
-    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,num_workers=4, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE,num_workers=4, pin_memory=True)
+    train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True,num_workers=4, pin_memory=pin_memory)
+    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE,num_workers=4, pin_memory=pin_memory)
 
     # === Modell initialization ===
     model = UNet(in_channels=3, out_channels=NUM_CLASSES).to(DEVICE)
@@ -158,11 +165,21 @@ def train_unet(output_dir, epochs):
 
 
 if __name__=="__main__":
-    ''' Input parameter: output_dir,  epochs'''
-    outputdir = 'output_unet'
-    epochs = 50
-    # train_unet(output_dir=outputdir, epochs=epochs)
-    train_unet(sys.argv[1:][0],sys.argv[1:][1])
+    ''' Input parameter: dataset_dir, output_dir,  epochs, nr of class'''
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("dataset_dir", type=str)
+    parser.add_argument("output_dir", type=str)
+    parser.add_argument("epochs", type=int)
+    parser.add_argument("class_items", type=int)
+    args = parser.parse_args()
+    dataset_dir = args.dataset_dir
+    outputdir = args.output_dir #'output_unet'
+    epochs = args.epochs #50 #=
+    class_items = args.class_items
+    train_unet(data_dir=dataset_dir, output_dir=outputdir, epochs=epochs, class_items=class_items)
+    #train_unet(sys.argv[1:][0],sys.argv[1:][1])
 
 
 
